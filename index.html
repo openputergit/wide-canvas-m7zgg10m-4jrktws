@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>56 Card Game</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        body {
+            background: linear-gradient(45deg, #1a1c2e, #4a2b50);
+            min-height: 100vh;
+            color: white;
+        }
+        .card {
+            perspective: 1000px;
+            width: 70px;
+            height: 100px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-10px);
+        }
+        .card-inner {
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.5s;
+        }
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+        .card-front {
+            background: #2d364c;
+            transform: rotateY(180deg);
+        }
+        .card-back {
+            background: linear-gradient(135deg, #4a2b50, #1a1c2e);
+        }
+        @media (max-width: 640px) {
+            .card {
+                width: 50px;
+                height: 70px;
+            }
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div id="app">
+        <div class="max-w-6xl mx-auto">
+            <!-- Game Setup -->
+            <div v-if="!gameStarted" class="glass p-8 rounded-xl text-center">
+                <h1 class="text-3xl mb-6">56 Card Game</h1>
+                <div class="mb-4">
+                    <label class="block mb-2">Number of Players (2-4):</label>
+                    <input type="number" v-model="numPlayers" min="2" max="4" class="bg-transparent glass p-2 rounded">
+                </div>
+                <button @click="startGame" class="glass px-6 py-2 rounded hover:bg-white/30 transition">
+                    Start Game
+                </button>
+            </div>
+
+            <!-- Game Board -->
+            <div v-else class="space-y-8">
+                <!-- Score Board -->
+                <div class="glass p-4 rounded-xl">
+                    <h2 class="text-xl mb-4">Scores</h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div v-for="(score, index) in scores" :key="index" class="text-center">
+                            Player {{index + 1}}: {{score}}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Player -->
+                <div class="glass p-4 rounded-xl text-center">
+                    <h3>Current Player: {{currentPlayer + 1}}</h3>
+                    <p>{{gameStatus}}</p>
+                </div>
+
+                <!-- Playing Area -->
+                <div class="glass p-4 rounded-xl">
+                    <div class="flex justify-center gap-2 flex-wrap">
+                        <div v-for="card in centerPile" class="card">
+                            <div class="card-inner">
+                                <div class="card-front glass">{{card}}</div>
+                                <div class="card-back"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Player Hand -->
+                <div class="glass p-4 rounded-xl">
+                    <h3 class="mb-4">Your Cards</h3>
+                    <div class="flex justify-center gap-2 flex-wrap">
+                        <div v-for="(card, index) in playerHands[currentPlayer]" 
+                             @click="playCard(index)"
+                             class="card"
+                             :class="{'flipped': true}">
+                            <div class="card-inner">
+                                <div class="card-front glass">{{card}}</div>
+                                <div class="card-back"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    gameStarted: false,
+                    numPlayers: 2,
+                    deck: [],
+                    playerHands: [],
+                    scores: [],
+                    currentPlayer: 0,
+                    centerPile: [],
+                    gameStatus: '',
+                }
+            },
+            methods: {
+                createDeck() {
+                    const values = ['9', '10', 'J', 'Q', 'K', 'A'];
+                    const deck = [];
+                    // Creating two sets of each card
+                    for (let i = 0; i < 2; i++) {
+                        for (const value of values) {
+                            deck.push(value);
+                            deck.push(value);
+                            deck.push(value);
+                            deck.push(value);
+                        }
+                    }
+                    return deck;
+                },
+                shuffleDeck(deck) {
+                    for (let i = deck.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [deck[i], deck[j]] = [deck[j], deck[i]];
+                    }
+                    return deck;
+                },
+                dealCards() {
+                    this.playerHands = [];
+                    for (let i = 0; i < this.numPlayers; i++) {
+                        const hand = this.deck.splice(0, 8);
+                        this.playerHands.push(hand);
+                    }
+                },
+                startGame() {
+                    this.deck = this.createDeck();
+                    this.deck = this.shuffleDeck(this.deck);
+                    this.scores = new Array(this.numPlayers).fill(0);
+                    this.dealCards();
+                    this.gameStarted = true;
+                    this.currentPlayer = 0;
+                    this.centerPile = [];
+                    this.gameStatus = 'Select a card to play';
+                },
+                playCard(index) {
+                    const card = this.playerHands[this.currentPlayer][index];
+                    
+                    // Remove card from player's hand
+                    this.playerHands[this.currentPlayer].splice(index, 1);
+                    
+                    // Add to center pile
+                    this.centerPile.push(card);
+                    
+                    // Check for matching cards
+                    this.checkMatches();
+                    
+                    // Next player
+                    this.currentPlayer = (this.currentPlayer + 1) % this.numPlayers;
+                    
+                    // Check if game is over
+                    if (this.isGameOver()) {
+                        this.endGame();
+                    }
+                },
+                checkMatches() {
+                    if (this.centerPile.length >= 2) {
+                        const lastCard = this.centerPile[this.centerPile.length - 1];
+                        const secondLastCard = this.centerPile[this.centerPile.length - 2];
+                        
+                        if (lastCard === secondLastCard) {
+                            this.scores[this.currentPlayer] += 2;
+                            this.centerPile = [];
+                            this.gameStatus = `Player ${this.currentPlayer + 1} scored 2 points!`;
+                        }
+                    }
+                },
+                isGameOver() {
+                    return this.playerHands.some(hand => hand.length === 0);
+                },
+                endGame() {
+                    const winner = this.scores.indexOf(Math.max(...this.scores));
+                    this.gameStatus = `Game Over! Player ${winner + 1} wins with ${this.scores[winner]} points!`;
+                    setTimeout(() => {
+                        if (confirm('Play again?')) {
+                            this.startGame();
+                        }
+                    }, 1500);
+                }
+            }
+        }).mount('#app')
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
